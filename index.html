@@ -1,43 +1,162 @@
-<button id="openBtn">KISKAÇ AÇ</button>
-<button id="closeBtn">KISKAÇ KAPAT</button>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robot Kol Kontrol Paneli</title>
+<style>
+:root {
+  --primary:#00adb5;
+  --bg:#1a1a2e;
+  --card:#16213e;
+  --text:#ffffff;
+}
+body {
+  font-family:'Segoe UI',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:20px;
+}
+.container {
+  background:var(--card);
+  padding:25px;
+  border-radius:15px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.5);
+  width:95%;
+  max-width:450px;
+}
+h1 { text-align:center; color:var(--primary); font-size:1.4rem; }
+.status { text-align:center; margin-bottom:20px; font-weight:900; }
+.dot { height:12px; width:12px; background:#ff4d4d; border-radius:50%; display:inline-block; margin-right:8px; }
+.online { background:#4caf50; box-shadow:0 0 10px #4caf50; }
+button#connectBtn {
+  background:var(--primary);
+  color:white; border:none; padding:15px;
+  border-radius:10px; width:100%; font-weight:900; cursor:pointer;
+  letter-spacing:1px;
+}
+.control-block{
+  background:rgba(255,255,255,0.05);
+  margin:15px 0;
+  padding:15px;
+  border-radius:12px;
+  border-left:5px solid var(--primary);
+  text-align:center;
+}
+.label{ display:block; font-size:1.1rem; font-weight:900; color:var(--text); margin-bottom:10px; }
+.angle-display{ color:var(--primary); font-weight:900; font-size:1.2rem; display:block; margin-bottom:10px; }
+button.move-btn{
+  background:var(--primary);
+  color:white;
+  border:none;
+  padding:10px 20px;
+  margin:5px;
+  border-radius:8px;
+  font-weight:700;
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>ROBOT KOL KONTROLÜ</h1>
+<div class="status">
+  <span id="statusDot" class="dot"></span>
+  <span id="statusText">BAĞLI DEĞİL</span>
+</div>
+<button id="connectBtn">BLUETOOTH İLE BAĞLAN</button>
+
+<!-- GÖVDE -->
+<div class="control-block">
+  <span class="angle-display" id="val1">90°</span>
+  <span class="label">GÖVDE</span>
+  <button class="move-btn" id="govdeLeft">SOL</button>
+  <button class="move-btn" id="govdeRight">SAĞ</button>
+</div>
+
+<!-- KISKAÇ -->
+<div class="control-block">
+  <span class="angle-display" id="val4">70°</span>
+  <span class="label">KISKAÇ</span>
+  <button class="move-btn" id="kiskacClose">KAPAT</button>
+  <button class="move-btn" id="kiskacOpen">AÇ</button>
+</div>
+
+</div>
 
 <script>
 let characteristic;
-let intervalKiskac;
+let govdePos = 90;
+let kiskacPos = 70;
+let intervalGovde, intervalKiskac;
 
-// Açma butonu
-document.getElementById('openBtn').addEventListener('mousedown', ()=>{
-  clearInterval(intervalKiskac);
-  intervalKiskac = setInterval(()=>{
-    sendIncrement('D', 1); // 1° artış
-  }, 50); // her 50ms bir adım
+// Bluetooth Bağlantısı
+document.getElementById('connectBtn').addEventListener('click', async()=>{
+  try{
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices:true,
+      optionalServices:['0000ffe0-0000-1000-8000-00805f9b34fb']
+    });
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+    characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+
+    document.getElementById('statusDot').classList.add('online');
+    document.getElementById('statusText').innerText="BAĞLI";
+    document.getElementById('connectBtn').style.display="none";
+  }catch(err){
+    alert("Hata: "+err.message);
+  }
 });
 
-document.getElementById('openBtn').addEventListener('mouseup', ()=>{
-  clearInterval(intervalKiskac);
-});
+// Fonksiyon: Servo değer gönder
+async function sendData(prefix, value, displayId){
+  if(characteristic){
+    document.getElementById(displayId).innerText = value + "°";
+    let encoder = new TextEncoder();
+    await characteristic.writeValue(encoder.encode(prefix + value + "\n"));
+  }
+}
 
-// Kapama butonu
-document.getElementById('closeBtn').addEventListener('mousedown', ()=>{
-  clearInterval(intervalKiskac);
-  intervalKiskac = setInterval(()=>{
-    sendIncrement('D', -1); // 1° azalış
+// GÖVDE SOL / SAĞ
+document.getElementById('govdeLeft').addEventListener('mousedown', ()=>{
+  clearInterval(intervalGovde);
+  intervalGovde = setInterval(()=>{
+    govdePos = Math.max(0, govdePos-1);
+    sendData('A', govdePos, 'val1');
   }, 50);
 });
-
-document.getElementById('closeBtn').addEventListener('mouseup', ()=>{
-  clearInterval(intervalKiskac);
+document.getElementById('govdeLeft').addEventListener('mouseup', ()=>clearInterval(intervalGovde));
+document.getElementById('govdeRight').addEventListener('mousedown', ()=>{
+  clearInterval(intervalGovde);
+  intervalGovde = setInterval(()=>{
+    govdePos = Math.min(180, govdePos+1);
+    sendData('A', govdePos, 'val1');
+  }, 50);
 });
+document.getElementById('govdeRight').addEventListener('mouseup', ()=>clearInterval(intervalGovde));
 
-let kiskacPos = 70; // Arduino ile aynı başlangıç
+// KISKAÇ KAPAT / AÇ
+document.getElementById('kiskacClose').addEventListener('mousedown', ()=>{
+  clearInterval(intervalKiskac);
+  intervalKiskac = setInterval(()=>{
+    kiskacPos = Math.max(30, kiskacPos-1); // sınır 30°
+    sendData('D', kiskacPos, 'val4');
+  }, 50);
+});
+document.getElementById('kiskacClose').addEventListener('mouseup', ()=>clearInterval(intervalKiskac));
 
-async function sendIncrement(prefix, step){
-  kiskacPos += step;
-  if(kiskacPos < 30) kiskacPos = 30;
-  if(kiskacPos > 110) kiskacPos = 110;
-
-  if(!characteristic) return;
-  let encoder = new TextEncoder();
-  await characteristic.writeValue(encoder.encode(prefix + kiskacPos + "\n"));
-}
+document.getElementById('kiskacOpen').addEventListener('mousedown', ()=>{
+  clearInterval(intervalKiskac);
+  intervalKiskac = setInterval(()=>{
+    kiskacPos = Math.min(110, kiskacPos+1); // sınır 110°
+    sendData('D', kiskacPos, 'val4');
+  }, 50);
+});
+document.getElementById('kiskacOpen').addEventListener('mouseup', ()=>clearInterval(intervalKiskac));
 </script>
+</body>
+</html>
