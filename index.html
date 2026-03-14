@@ -1,22 +1,22 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Robot Kol Buton Kontrol</title>
-    <style>
-        :root { --primary: #00adb5; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { background: var(--card); padding: 20px; border-radius: 15px; width: 95%; max-width: 400px; }
-        .status { text-align: center; margin-bottom: 15px; font-weight: 900; }
-        .control-block { background: rgba(255,255,255,0.05); margin: 10px 0; padding: 15px; border-radius: 10px; border-left: 5px solid var(--primary); }
-        .label { display: block; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
-        .btn-group { display: flex; gap: 10px; justify-content: center; }
-        button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; }
-        button:active { background: #008d94; }
-        .connect-btn { background: #4caf50; width: 100%; padding: 15px; margin-bottom: 20px; font-size: 1.1rem; }
-        .angle-display { float: right; color: var(--primary); font-weight: 900; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robot Kol Buton Kontrol</title>
+<style>
+:root { --primary: #00adb5; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; }
+body { font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 20px; }
+.container { background: var(--card); padding: 20px; border-radius: 15px; width: 95%; max-width: 400px; }
+.status { text-align: center; margin-bottom: 15px; font-weight: 900; }
+.control-block { background: rgba(255,255,255,0.05); margin: 10px 0; padding: 15px; border-radius: 10px; border-left: 5px solid var(--primary); }
+.label { display: block; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
+.btn-group { display: flex; gap: 10px; justify-content: center; }
+button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; }
+button:active { background: #008d94; }
+.connect-btn { background: #4caf50; width: 100%; padding: 15px; margin-bottom: 20px; font-size: 1.1rem; }
+.angle-display { float: right; color: var(--primary); font-weight: 900; }
+</style>
 </head>
 <body>
 
@@ -28,9 +28,9 @@
         <span class="angle-display" id="valA">90°</span>
         <label class="label">GÖVDE</label>
         <div class="btn-group">
-            <button onclick="changeAngle('A', -10)">SOLA</button>
+            <button id="govdeLeft">SOLA</button>
             <button onclick="setAngle('A', 90)">MERKEZ</button>
-            <button onclick="changeAngle('A', 10)">SAĞA</button>
+            <button id="govdeRight">SAĞA</button>
         </div>
     </div>
 
@@ -38,56 +38,76 @@
         <span class="angle-display" id="valB">90°</span>
         <label class="label">KOL</label>
         <div class="btn-group">
-            <button onclick="changeAngle('B', -10)">AŞAĞI</button>
-            <button onclick="changeAngle('B', 10)">YUKARI</button>
+            <button id="kolDown">AŞAĞI</button>
+            <button id="kolUp">YUKARI</button>
         </div>
     </div>
 
     <div class="control-block">
-        <span class="angle-display" id="valD">90°</span>
+        <span class="angle-display" id="valD">70°</span>
         <label class="label">KISKAÇ</label>
         <div class="btn-group">
-            <button onclick="setAngle('D', 0)">KAPAT</button>
-            <button onclick="setAngle('D', 90)">AÇ</button>
+            <button onclick="setAngle('D', 30)">KAPAT</button>
+            <button onclick="setAngle('D', 110)">AÇ</button>
         </div>
     </div>
 </div>
 
 <script>
-    let characteristic;
-    let angles = { A: 90, B: 90, C: 90, D: 90 };
+let characteristic;
+let angles = { A: 90, B: 90, D: 70 }; // C ekseni eklenebilir
+let intervals = {}; // buton basılı tutma interval'ları
 
-    document.getElementById('connectBtn').addEventListener('click', async () => {
-        try {
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
-            });
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-            characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-            document.getElementById('statusText').innerText = "🟢 BAĞLI";
-            document.getElementById('connectBtn').style.display = "none";
-        } catch (err) { alert(err); }
+document.getElementById('connectBtn').addEventListener('click', async () => {
+    try {
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+        });
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+        characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+        document.getElementById('statusText').innerText = "🟢 BAĞLI";
+        document.getElementById('connectBtn').style.display = "none";
+    } catch (err) { alert(err); }
+});
+
+// Tek seferlik açı gönderimi
+async function setAngle(p, val) {
+    angles[p] = val;
+    update(p);
+}
+
+// Basılı tutma ile adım adım açı gönderimi
+function holdButton(btnId, p, step, intervalTime=50) {
+    const btn = document.getElementById(btnId);
+    btn.addEventListener('mousedown', ()=>{
+        clearInterval(intervals[btnId]);
+        intervals[btnId] = setInterval(()=>{
+            angles[p] = Math.min(180, Math.max(p==='D'?30:0, angles[p] + step));
+            update(p);
+        }, intervalTime);
     });
+    btn.addEventListener('mouseup', ()=>clearInterval(intervals[btnId]));
+    btn.addEventListener('mouseleave', ()=>clearInterval(intervals[btnId]));
+}
 
-    function changeAngle(p, delta) {
-        angles[p] = Math.min(180, Math.max(0, angles[p] + delta));
-        update(p);
-    }
+// GÖVDE
+holdButton('govdeLeft','A', -1);
+holdButton('govdeRight','A', 1);
 
-    function setAngle(p, val) {
-        angles[p] = val;
-        update(p);
-    }
+// KOL
+holdButton('kolDown','B', -1);
+holdButton('kolUp','B', 1);
 
-    async function update(p) {
-        document.getElementById('val' + p).innerText = angles[p] + "°";
-        if (characteristic) {
-            const data = new TextEncoder().encode(p + angles[p] + "\n");
-            await characteristic.writeValue(data);
-        }
+// Servo güncelleme
+async function update(p) {
+    document.getElementById('val'+p).innerText = angles[p]+"°";
+    if(characteristic){
+        const data = new TextEncoder().encode(p + angles[p] + "\n");
+        await characteristic.writeValue(data);
     }
+}
 </script>
 </body>
 </html>
