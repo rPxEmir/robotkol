@@ -1,22 +1,26 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Robot Kol Buton Kontrol</title>
-<style>
-:root { --primary: #00adb5; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; }
-body { font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 20px; }
-.container { background: var(--card); padding: 20px; border-radius: 15px; width: 95%; max-width: 400px; }
-.status { text-align: center; margin-bottom: 15px; font-weight: 900; }
-.control-block { background: rgba(255,255,255,0.05); margin: 10px 0; padding: 15px; border-radius: 10px; border-left: 5px solid var(--primary); }
-.label { display: block; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
-.btn-group { display: flex; gap: 10px; justify-content: center; }
-button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; }
-button:active { background: #008d94; }
-.connect-btn { background: #4caf50; width: 100%; padding: 15px; margin-bottom: 20px; font-size: 1.1rem; }
-.angle-display { float: right; color: var(--primary); font-weight: 900; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Kol Basılı Tut Kontrol</title>
+    <style>
+        :root { --primary: #00adb5; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 20px; -webkit-user-select: none; }
+        .container { background: var(--card); padding: 20px; border-radius: 15px; width: 95%; max-width: 400px; }
+        .status { text-align: center; margin-bottom: 15px; font-weight: 900; }
+        .control-block { background: rgba(255,255,255,0.05); margin: 15px 0; padding: 15px; border-radius: 10px; border-left: 5px solid var(--primary); }
+        .label { display: block; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; font-size: 0.9rem; }
+        .btn-group { display: flex; gap: 10px; }
+        button { 
+            background: var(--primary); color: white; border: none; padding: 20px; 
+            border-radius: 10px; font-weight: bold; cursor: pointer; flex: 1;
+            touch-action: manipulation; /* Mobilde zoom engellemek için */
+        }
+        button:active { background: #017c82; transform: scale(0.95); }
+        .angle-display { float: right; color: var(--primary); font-weight: 900; }
+        .connect-btn { background: #4caf50; width: 100%; padding: 15px; margin-bottom: 20px; border-radius: 10px; border:none; color:white; font-weight:bold;}
+    </style>
 </head>
 <body>
 
@@ -26,88 +30,76 @@ button:active { background: #008d94; }
 
     <div class="control-block">
         <span class="angle-display" id="valA">90°</span>
-        <label class="label">GÖVDE</label>
+        <label class="label">GÖVDE (SOLA - SAĞA)</label>
         <div class="btn-group">
-            <button id="govdeLeft">SOLA</button>
-            <button onclick="setAngle('A', 90)">MERKEZ</button>
-            <button id="govdeRight">SAĞA</button>
+            <button onmousedown="startMove('A', -2)" onmouseup="stopMove()" ontouchstart="startMove('A', -2)" ontouchend="stopMove()">SOLA</button>
+            <button onmousedown="startMove('A', 2)" onmouseup="stopMove()" ontouchstart="startMove('A', 2)" ontouchend="stopMove()">SAĞA</button>
         </div>
     </div>
 
     <div class="control-block">
         <span class="angle-display" id="valB">90°</span>
-        <label class="label">KOL</label>
+        <label class="label">KOL (AŞAĞI - YUKARI)</label>
         <div class="btn-group">
-            <button id="kolDown">AŞAĞI</button>
-            <button id="kolUp">YUKARI</button>
+            <button onmousedown="startMove('B', -2)" onmouseup="stopMove()" ontouchstart="startMove('B', -2)" ontouchend="stopMove()">AŞAĞI</button>
+            <button onmousedown="startMove('B', 2)" onmouseup="stopMove()" ontouchstart="startMove('B', 2)" ontouchend="stopMove()">YUKARI</button>
         </div>
     </div>
 
     <div class="control-block">
-        <span class="angle-display" id="valD">70°</span>
-        <label class="label">KISKAÇ</label>
+        <span class="angle-display" id="valD">90°</span>
+        <label class="label">KISKAÇ (KAPAT - AÇ)</label>
         <div class="btn-group">
-            <button onclick="setAngle('D', 30)">KAPAT</button>
-            <button onclick="setAngle('D', 110)">AÇ</button>
+            <button onmousedown="startMove('D', -5)" onmouseup="stopMove()" ontouchstart="startMove('D', -5)" ontouchend="stopMove()">KAPAT</button>
+            <button onmousedown="startMove('D', 5)" onmouseup="stopMove()" ontouchstart="startMove('D', 5)" ontouchend="stopMove()">AÇ</button>
         </div>
     </div>
 </div>
 
 <script>
-let characteristic;
-let angles = { A: 90, B: 90, D: 70 }; // C ekseni eklenebilir
-let intervals = {}; // buton basılı tutma interval'ları
+    let characteristic;
+    let angles = { A: 90, B: 90, C: 90, D: 90 };
+    let moveTimer;
 
-document.getElementById('connectBtn').addEventListener('click', async () => {
-    try {
-        const device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
-        });
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-        characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-        document.getElementById('statusText').innerText = "🟢 BAĞLI";
-        document.getElementById('connectBtn').style.display = "none";
-    } catch (err) { alert(err); }
-});
-
-// Tek seferlik açı gönderimi
-async function setAngle(p, val) {
-    angles[p] = val;
-    update(p);
-}
-
-// Basılı tutma ile adım adım açı gönderimi
-function holdButton(btnId, p, step, intervalTime=50) {
-    const btn = document.getElementById(btnId);
-    btn.addEventListener('mousedown', ()=>{
-        clearInterval(intervals[btnId]);
-        intervals[btnId] = setInterval(()=>{
-            angles[p] = Math.min(180, Math.max(p==='D'?30:0, angles[p] + step));
-            update(p);
-        }, intervalTime);
+    document.getElementById('connectBtn').addEventListener('click', async () => {
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+            });
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+            characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+            document.getElementById('statusText').innerText = "🟢 BAĞLI";
+            document.getElementById('connectBtn').style.display = "none";
+        } catch (err) { console.log(err); }
     });
-    btn.addEventListener('mouseup', ()=>clearInterval(intervals[btnId]));
-    btn.addEventListener('mouseleave', ()=>clearInterval(intervals[btnId]));
-}
 
-// GÖVDE
-holdButton('govdeLeft','A', -1);
-holdButton('govdeRight','A', 1);
-
-// KOL
-holdButton('kolDown','B', -1);
-holdButton('kolUp','B', 1);
-
-// Servo güncelleme
-async function update(p) {
-    document.getElementById('val'+p).innerText = angles[p]+"°";
-    if(characteristic){
-        const data = new TextEncoder().encode(p + angles[p] + "\n");
-        await characteristic.writeValue(data);
+    function startMove(p, delta) {
+        if (moveTimer) clearInterval(moveTimer);
+        moveTimer = setInterval(() => {
+            angles[p] = Math.min(180, Math.max(0, angles[p] + delta));
+            updateUI(p);
+            sendBT(p, angles[p]);
+        }, 50); // Her 50ms'de bir veri gönderir (Akıcı hareket)
     }
-}
+
+    function stopMove() {
+        clearInterval(moveTimer);
+    }
+
+    function updateUI(p) {
+        document.getElementById('val' + p).innerText = angles[p] + "°";
+    }
+
+    async function sendBT(p, val) {
+        if (characteristic) {
+            try {
+                const data = new TextEncoder().encode(p + val + "\n");
+                await characteristic.writeValue(data);
+            } catch (e) { console.log("Gönderim hatası"); }
+        }
+    }
 </script>
 </body>
 </html>
