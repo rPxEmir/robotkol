@@ -3,49 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Robot Kol | Kesintisiz Kontrol</title>
+    <title>Robot Kol | Joystick Kontrol</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
     <style>
         :root { --primary: #00adb5; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 20px; user-select: none; touch-action: none; }
-        .container { background: var(--card); padding: 20px; border-radius: 15px; width: 95%; max-width: 400px; }
-        .control-block { background: rgba(255,255,255,0.05); margin: 15px 0; padding: 15px; border-radius: 10px; border-left: 5px solid var(--primary); }
-        .label { display: block; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
-        .btn-group { display: flex; gap: 10px; }
-        button { background: var(--primary); color: white; border: none; padding: 25px 10px; border-radius: 10px; font-weight: 900; cursor: pointer; flex: 1; -webkit-tap-highlight-color: transparent; }
-        button:active { background: #017c82; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; overflow: hidden; touch-action: none; }
+        .container { background: var(--card); padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; text-align: center; }
+        #joystick-zone { width: 100%; height: 200px; background: rgba(255,255,255,0.05); position: relative; margin: 20px 0; border-radius: 10px; border: 2px dashed var(--primary); }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        button { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; flex: 1; cursor: pointer; }
         .connect-btn { background: #4caf50; width: 100%; padding: 15px; margin-bottom: 20px; border-radius: 10px; border:none; color:white; font-weight:900;}
-        .angle-display { float: right; color: var(--primary); font-weight: 900; }
+        .angle-info { font-size: 0.9rem; margin-top: 10px; color: var(--primary); font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="statusText" style="text-align:center; margin-bottom:10px; font-weight:bold;">BAĞLI DEĞİL</div>
+    <div id="statusText">🔴 BAĞLI DEĞİL</div>
     <button class="connect-btn" id="connectBtn">BLUETOOTH BAĞLAN</button>
-
-    <div class="control-block">
-        <span class="angle-display" id="valA">90°</span>
-        <label class="label">GÖVDE (SOLA - SAĞA)</label>
-        <div class="btn-group">
-            <button onmousedown="startMove('A', -2)" onmouseup="stopMove()" ontouchstart="startMove('A', -2)" ontouchend="stopMove()">SOLA</button>
-            <button onmousedown="startMove('A', 2)" onmouseup="stopMove()" ontouchstart="startMove('A', 2)" ontouchend="stopMove()">SAĞA</button>
-        </div>
-    </div>
-
-    <div class="control-block">
-        <span class="angle-display" id="valB">90°</span>
-        <label class="label">KOL (AŞAĞI - YUKARI)</label>
-        <div class="btn-group">
-            <button onmousedown="startMove('B', -2)" onmouseup="stopMove()" ontouchstart="startMove('B', -2)" ontouchend="stopMove()">AŞAĞI</button>
-            <button onmousedown="startMove('B', 2)" onmouseup="stopMove()" ontouchstart="startMove('B', 2)" ontouchend="stopMove()">YUKARI</button>
-        </div>
+    
+    <div class="angle-info">Joystick ile Gövde (A) ve Kol (B) Kontrolü</div>
+    <div id="joystick-zone"></div>
+    
+    <div class="angle-info">Kıskaç (D) Kontrolü</div>
+    <div class="btn-group">
+        <button onmousedown="sendD(0)" ontouchstart="sendD(0)">KAPAT</button>
+        <button onmousedown="sendD(90)" ontouchstart="sendD(90)">AÇ</button>
     </div>
 </div>
 
 <script>
     let characteristic;
-    let angles = { A: 90, B: 90 };
-    let moveTimer = null;
+    let angles = { A: 90, B: 90, D: 90 };
+    let lastSentTime = 0;
 
     document.getElementById('connectBtn').addEventListener('click', async () => {
         try {
@@ -56,25 +46,47 @@
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
             characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-            document.getElementById('statusText').innerText = "BAĞLI";
+            document.getElementById('statusText').innerText = "🟢 BAĞLI";
+            document.getElementById('connectBtn').style.display = "none";
         } catch (err) { alert(err); }
     });
 
-    function startMove(p, delta) {
-        if (moveTimer) return;
-        moveTimer = setInterval(() => {
-            angles[p] = Math.min(180, Math.max(0, angles[p] + delta));
-            document.getElementById('val' + p).innerText = angles[p] + "°";
-            if (characteristic) {
-                const data = new TextEncoder().encode(p + angles[p] + "\n");
-                characteristic.writeValue(data).catch(() => {});
-            }
-        }, 70); // Titremeyi önlemek için veri gönderme sıklığını 70ms yaptık
-    }
+    // Joystick Kurulumu
+    const manager = nipplejs.create({
+        zone: document.getElementById('joystick-zone'),
+        mode: 'static',
+        position: { left: '50%', top: '50%' },
+        color: '#00adb5',
+        size: 150
+    });
 
-    function stopMove() {
-        clearInterval(moveTimer);
-        moveTimer = null;
+    manager.on('move', (evt, data) => {
+        if (!data.angle) return;
+        
+        // Joystick yönüne göre açıları hesapla
+        // x ve y eksenleri -1 ile 1 arası gelir, biz bunu açıya çeviriyoruz
+        let moveX = Math.round(data.vector.x * 10);
+        let moveY = Math.round(data.vector.y * 10);
+
+        angles.A = Math.min(180, Math.max(0, angles.A + (moveX > 2 ? 2 : moveX < -2 ? -2 : 0)));
+        angles.B = Math.min(180, Math.max(0, angles.B + (moveY > 2 ? 2 : moveY < -2 ? -2 : 0)));
+
+        // Bluetooth'u saniyede en fazla 15 kez güncelle (Titremeyi engellemek için)
+        let now = Date.now();
+        if (now - lastSentTime > 70) {
+            sendBT('A', angles.A);
+            setTimeout(() => sendBT('B', angles.B), 20); // İki veri arasına boşluk koy
+            lastSentTime = now;
+        }
+    });
+
+    function sendD(val) { sendBT('D', val); }
+
+    async function sendBT(p, val) {
+        if (characteristic) {
+            const data = new TextEncoder().encode(p + val + "\n");
+            characteristic.writeValue(data).catch(() => {});
+        }
     }
 </script>
 </body>
