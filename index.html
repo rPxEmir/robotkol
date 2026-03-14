@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mekatronik Robot Kol Kontrol</title>
+    <title>Mekatronik Servo Kontrol</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; background: #f4f4f4; padding: 20px; }
-        .box { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        .box { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
         button { background: #4CAF50; color: white; padding: 15px 30px; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; width: 100%; }
-        .control-group { margin: 30px 0; padding: 10px; border-bottom: 1px solid #eee; }
-        input[type=range] { width: 100%; margin: 15px 0; height: 20px; cursor: pointer; }
-        label { font-weight: bold; font-size: 1.2rem; color: #333; }
+        .control-group { margin: 25px 0; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+        .control-group:last-child { border-bottom: none; }
+        input[type=range] { width: 100%; margin: 15px 0; height: 15px; cursor: pointer; }
+        h2 { font-size: 1.2rem; color: #333; margin: 0; }
         span { color: #4CAF50; font-weight: bold; }
     </style>
 </head>
@@ -18,26 +19,26 @@
     <div class="box">
         <h1>Robot Kol Kontrol</h1>
         <button id="baglanButon">Cihaz Ara ve Bağlan</button>
-        <hr>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
 
         <div class="control-group">
-            <label>GÖVDE (A): <span id="valA">90</span>°</label>
-            <input type="range" id="sliderA" min="0" max="180" value="90" oninput="sendData('A', this.value)">
+            <h2>Gövde (A): <span id="valA">90</span></h2>
+            <input type="range" min="0" max="180" value="90" oninput="sendData('A', this.value)">
         </div>
 
         <div class="control-group">
-            <label>KOL (B): <span id="valB">90</span>°</label>
-            <input type="range" id="sliderB" min="0" max="180" value="90" oninput="sendData('B', this.value)">
+            <h2>Kol (B): <span id="valB">90</span></h2>
+            <input type="range" min="0" max="180" value="90" oninput="sendData('B', this.value)">
         </div>
 
         <div class="control-group">
-            <label>DİRSEK (C): <span id="valC">90</span>°</label>
-            <input type="range" id="sliderC" min="0" max="180" value="90" oninput="sendData('C', this.value)">
+            <h2>Dirsek (C): <span id="valC">90</span></h2>
+            <input type="range" min="0" max="180" value="90" oninput="sendData('C', this.value)">
         </div>
 
         <div class="control-group">
-            <label>KISKAÇ (D): <span id="valD">90</span>°</label>
-            <input type="range" id="sliderD" min="0" max="180" value="90" oninput="sendData('D', this.value)">
+            <h2>Kıskaç (D): <span id="valD">90</span></h2>
+            <input type="range" min="0" max="180" value="90" oninput="sendData('D', this.value)">
         </div>
     </div>
 
@@ -51,10 +52,12 @@
                     acceptAllDevices: true,
                     optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
                 });
+
                 const server = await cihaz.gatt.connect();
                 const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
                 karakter = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-                document.getElementById('baglanButon').innerText = "Bağlantı Başarılı ✅";
+                
+                document.getElementById('baglanButon').innerText = "Bağlantı Başarılı!";
                 document.getElementById('baglanButon').style.background = "#2196F3";
             } catch (hata) {
                 alert("Hata: " + hata.message);
@@ -62,20 +65,19 @@
         });
 
         async function sendData(prefix, deger) {
-            // Arayüzü güncelle
+            // Ekranda değeri güncelle
             document.getElementById('val' + prefix).innerText = deger;
 
             // Bluetooth üzerinden gönder (A90\n formatında)
             if (karakter && !isSending) {
                 isSending = true;
                 try {
-                    let encoder = new TextEncoder();
-                    let veri = encoder.encode(prefix + deger + "\n");
+                    let veri = new TextEncoder().encode(prefix + deger + "\n");
                     await karakter.writeValue(veri);
                 } catch (e) {
-                    console.log("Gönderim hatası");
+                    console.error("Gönderim hatası");
                 }
-                // Veri trafiğini rahatlatmak için 50ms bekle
+                // Veri hattını yormamak için 50ms bekleme
                 setTimeout(() => { isSending = false; }, 50);
             }
         }
