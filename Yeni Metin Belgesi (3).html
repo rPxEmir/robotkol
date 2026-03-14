@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Robot Kol Kontrol</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; }
+        #slider { width: 80%; height: 50px; }
+        button { padding: 20px; font-size: 20px; background: #2196F3; color: white; border: none; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Robot Kol Kontrol</h1>
+    <button onclick="baglan()">Bluetooth'a Bağlan</button>
+    <br><br><br>
+    <input type="range" id="slider" min="0" max="180" value="90" oninput="gonder(this.value)">
+    <h2 id="aci">Açı: 90</h2>
+
+    <script>
+        let cihaz, karakter;
+
+        async function baglan() {
+            try {
+                cihaz = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'HM-1' }], // Modül adın HM-10 ise
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                });
+                const server = await cihaz.gatt.connect();
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                karakter = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+                alert("Bağlantı Başarılı!");
+            } catch (hata) { console.log(hata); }
+        }
+
+        async function gonder(deger) {
+            document.getElementById("aci").innerText = "Açı: " + deger;
+            if (karakter) {
+                let veri = new Uint8Array([parseInt(deger)]);
+                await karakter.writeValue(veri);
+            }
+        }
+    </script>
+</body>
+</html>
